@@ -25,7 +25,6 @@ autoreplySent = set()
 def stateWatcher(newstate, *args):
     global plugin
     if ((mw.state == "overview") and (newstate == "review")):
-        print "entering review"
         plugin['reviewingState'] = True
         plugin['startTime'] = time.time()
         plugin['reportedMinutes'] = 0
@@ -36,7 +35,6 @@ def stateWatcher(newstate, *args):
         # force refresh in case somebody messages before the timer
         refreshPidginAway()
     if ((plugin['reviewingState'] == True) and (newstate == "deckBrowser" or newstate == "overview")):
-        print "leaving review"
         plugin['reviewingState'] = False
         if plugin['savedStatus'] is not None:
             pidginLock.acquire()
@@ -45,7 +43,6 @@ def stateWatcher(newstate, *args):
             plugin['savedStatus'] = None
 
 def imReceived(account, sender, message, conversation, flags):
-    print sender, "said:", message, threading.currentThread()
     if not plugin['reviewingState']:
         return
     # send maximum of one reply per sessions to avoid message loops
@@ -69,7 +66,6 @@ def refreshPidginAway():
         status = purple.PurpleSavedstatusNew("", 3)
         purple.PurpleSavedstatusSetMessage(status, "Back in " + str(mins) + " minutes.")
         purple.PurpleSavedstatusActivate(status)
-        print "Setting away message", mins
         pidginLock.release()
         plugin['reportedMinutes'] = mins
     return True # repeating timer
