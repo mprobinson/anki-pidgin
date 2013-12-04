@@ -8,10 +8,13 @@
 
 from anki.hooks import wrap
 from aqt import mw
+from aqt.qt import *
+from aqt.utils import showInfo
 import threading
 import dbus
 import gobject
 import time
+
 from dbus.mainloop.glib import DBusGMainLoop
 
 plugin = {}
@@ -19,8 +22,19 @@ plugin['reviewingState'] = False
 plugin['startTime'] = 0
 plugin['reportedMinutes'] = 0
 plugin['savedStatus'] = None
+plugin['enabled'] = True # always default to True to avoid forgetting
 
 autoreplySent = set()
+
+def toggleEnabled():
+    global plugin
+    plugin['enabled'] = enableAction.isChecked()
+
+enableAction = QAction("Update Pidgin status", mw)
+enableAction.setCheckable(True)
+enableAction.setChecked(plugin['enabled'])
+mw.connect(enableAction, SIGNAL("triggered()"), toggleEnabled)
+mw.form.menuTools.addAction(enableAction)
 
 def stateWatcher(newstate, *args):
     global plugin
@@ -36,7 +50,7 @@ def stateWatcher(newstate, *args):
         refreshPidginAway()
     if ((plugin['reviewingState'] == True) and (newstate == "deckBrowser" or newstate == "overview")):
         plugin['reviewingState'] = False
-        if plugin['savedStatus'] is not None:
+        if (plugin['savedStatus'] is not None) and plugin['enabled']:
             pidginLock.acquire()
             purple.PurpleSavedstatusActivate(plugin['savedStatus'])
             pidginLock.release()
@@ -46,7 +60,7 @@ def imReceived(account, sender, message, conversation, flags):
     if not plugin['reviewingState']:
         return
     # send maximum of one reply per sessions to avoid message loops
-    if conversation not in autoreplySent:
+    if (conversation not in autoreplySent) and plugin['enabled']:
         pidginLock.acquire()
         purple.PurpleConvImSend(purple.PurpleConvIm(conversation),
                                 "[autoreply] I am currently studying using Anki, back in " + str(plugin['reportedMinutes']) + " minutes. See my away status for progress report.")
@@ -60,7 +74,7 @@ def refreshPidginAway():
     endtime = mw.col.conf['timeLim'] + plugin['startTime']
     mins = int(round((endtime - time.time())/60))
     # check if time changed enough to report
-    if (mins != plugin['reportedMinutes']):
+    if (mins != plugin['reportedMinutes']) and plugin['enabled']:
         pidginLock.acquire()
         # PURPLE_STATUS_UNAVAILABLE
         status = purple.PurpleSavedstatusNew("", 3)
